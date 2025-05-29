@@ -4,8 +4,9 @@ const nextConfig: NextConfig = {
   /* config options here */
   reactStrictMode: true,
   experimental: {
-    optimizeCss: true,
+    optimizeCss: false,
   },
+  basePath: "",
 };
 
 export default nextConfig;
