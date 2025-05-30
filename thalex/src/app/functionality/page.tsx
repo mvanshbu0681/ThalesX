@@ -318,26 +318,19 @@ export default function FunctionalityPage() {
     setIsWithLoading(true);
 
     try {
-      // Send input and get pseudonymized output
-      await apiService.sendPseudonymizedInput(content);
-      const pseudonymizedResponse = await apiService.getPseudonymizedOutput();
-
-      // Local masking for demonstration (you can remove this if API handles it)
+      // Use hardcoded masking
       const { maskedContent, detectedItems } = maskSensitiveData(content);
+
+      // Simulate API delay
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       const botResponse: Message = {
         id: (Date.now() + 1).toString(),
-        content:
-          pseudonymizedResponse.output || `Original response for: "${content}"`,
-        maskedContent:
-          pseudonymizedResponse.pseudonymized_output ||
-          `Privacy-protected response: "${maskedContent}"`,
+        content: `Original response for: "${content}"`,
+        maskedContent: `Privacy-protected response for: "${maskedContent}"`,
         isUser: false,
         timestamp: new Date(),
-        sensitiveItems:
-          detectedItems.length > 0
-            ? detectedItems
-            : pseudonymizedResponse.detected_entities || [],
+        sensitiveItems: detectedItems,
       };
 
       setWithMessages((prev) => [...prev.slice(0, -1), botResponse]);
