@@ -436,7 +436,7 @@ export default function FunctionalityPage() {
             className="h-full"
           >
             <ChatInterface
-              title="Without Cape"
+              title="Without CaPE"
               description="Traditional AI chat without privacy protection"
               messages={withoutMessages}
               onSendMessage={handleWithoutMessage}
@@ -455,7 +455,7 @@ export default function FunctionalityPage() {
             className="h-full"
           >
             <ChatInterface
-              title="With Cape"
+              title="With CaPE"
               description="Privacy-protected AI chat with real-time data masking"
               messages={withMessages}
               onSendMessage={handleWithMessage}
