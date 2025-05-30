@@ -9,6 +9,7 @@ import {
   ArrowLeft,
   Eye,
   EyeOff,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -19,7 +20,37 @@ interface Message {
   timestamp: Date;
   maskedContent?: string;
   sensitiveItems?: string[];
+  isLoading?: boolean;
 }
+
+// API service functions
+const API_BASE_URL = "https://amartyasaran-cape.hf.space";
+
+const apiService = {
+  async sendPseudonymizedInput(text: string) {
+    const response = await fetch(`${API_BASE_URL}/pseudonymized-input`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ text }),
+    });
+    if (!response.ok) throw new Error("Failed to send pseudonymized input");
+    return response.json();
+  },
+
+  async getRawOutput() {
+    const response = await fetch(`${API_BASE_URL}/raw-output`);
+    if (!response.ok) throw new Error("Failed to get raw output");
+    return response.json();
+  },
+
+  async getPseudonymizedOutput() {
+    const response = await fetch(`${API_BASE_URL}/pseudonymized-output`);
+    if (!response.ok) throw new Error("Failed to get pseudonymized output");
+    return response.json();
+  },
+};
 
 const ChatInterface = ({
   title,
@@ -29,6 +60,7 @@ const ChatInterface = ({
   showMasking = false,
   icon: Icon,
   accentColor,
+  isLoading = false,
 }: {
   title: string;
   description: string;
@@ -37,11 +69,12 @@ const ChatInterface = ({
   showMasking?: boolean;
   icon: any;
   accentColor: string;
+  isLoading?: boolean;
 }) => {
   const [inputValue, setInputValue] = useState("");
 
   const handleSend = () => {
-    if (inputValue.trim()) {
+    if (inputValue.trim() && !isLoading) {
       onSendMessage(inputValue);
       setInputValue("");
     }
@@ -61,6 +94,7 @@ const ChatInterface = ({
         <div className="flex items-center gap-3 mb-2">
           <Icon className="w-6 h-6" />
           <h3 className="text-lg font-semibold">{title}</h3>
+          {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
         </div>
         <p className="text-sm opacity-90">{description}</p>
       </div>
@@ -88,22 +122,31 @@ const ChatInterface = ({
                     : "bg-gray-100 dark:bg-gray-800 text-foreground"
                 }`}
               >
-                <p className="text-sm">
-                  {showMasking && message.maskedContent && !message.isUser
-                    ? message.maskedContent
-                    : message.content}
-                </p>
-                {showMasking &&
-                  message.sensitiveItems &&
-                  message.sensitiveItems.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                      <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                        <Shield className="w-3 h-3" />
-                        {message.sensitiveItems.length} sensitive item(s)
-                        protected
-                      </p>
-                    </div>
-                  )}
+                {message.isLoading ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="text-sm">Processing...</span>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm">
+                      {showMasking && message.maskedContent && !message.isUser
+                        ? message.maskedContent
+                        : message.content}
+                    </p>
+                    {showMasking &&
+                      message.sensitiveItems &&
+                      message.sensitiveItems.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                          <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                            <Shield className="w-3 h-3" />
+                            {message.sensitiveItems.length} sensitive item(s)
+                            protected
+                          </p>
+                        </div>
+                      )}
+                  </>
+                )}
               </div>
             </motion.div>
           ))
@@ -119,16 +162,21 @@ const ChatInterface = ({
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Type your message..."
-            className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800"
+            disabled={isLoading}
+            className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 disabled:opacity-50"
           />
           <motion.button
             onClick={handleSend}
-            disabled={!inputValue.trim()}
+            disabled={!inputValue.trim() || isLoading}
             className={`px-4 py-2 ${accentColor} text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed`}
-            whileHover={{ scale: inputValue.trim() ? 1.05 : 1 }}
-            whileTap={{ scale: inputValue.trim() ? 0.95 : 1 }}
+            whileHover={{ scale: inputValue.trim() && !isLoading ? 1.05 : 1 }}
+            whileTap={{ scale: inputValue.trim() && !isLoading ? 0.95 : 1 }}
           >
-            <Send className="w-4 h-4" />
+            {isLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
           </motion.button>
         </div>
       </div>
@@ -139,6 +187,8 @@ const ChatInterface = ({
 export default function FunctionalityPage() {
   const [withoutMessages, setWithoutMessages] = useState<Message[]>([]);
   const [withMessages, setWithMessages] = useState<Message[]>([]);
+  const [isWithoutLoading, setIsWithoutLoading] = useState(false);
+  const [isWithLoading, setIsWithLoading] = useState(false);
 
   const sampleSensitiveData = [
     "My social security number is 123-45-6789",
@@ -200,7 +250,7 @@ export default function FunctionalityPage() {
     return { maskedContent, detectedItems };
   };
 
-  const handleWithoutMessage = (content: string) => {
+  const handleWithoutMessage = async (content: string) => {
     const userMessage: Message = {
       id: Date.now().toString(),
       content,
@@ -208,19 +258,47 @@ export default function FunctionalityPage() {
       timestamp: new Date(),
     };
 
-    const botResponse: Message = {
+    const loadingMessage: Message = {
       id: (Date.now() + 1).toString(),
-      content: `I can see your message: "${content}". I'll process this information as provided.`,
+      content: "",
       isUser: false,
       timestamp: new Date(),
+      isLoading: true,
     };
 
-    setWithoutMessages((prev) => [...prev, userMessage, botResponse]);
+    setWithoutMessages((prev) => [...prev, userMessage, loadingMessage]);
+    setIsWithoutLoading(true);
+
+    try {
+      // Send input and get raw output
+      await apiService.sendPseudonymizedInput(content);
+      const rawResponse = await apiService.getRawOutput();
+
+      const botResponse: Message = {
+        id: (Date.now() + 1).toString(),
+        content:
+          rawResponse.output ||
+          `Raw response: "${content}" - processed without privacy protection.`,
+        isUser: false,
+        timestamp: new Date(),
+      };
+
+      setWithoutMessages((prev) => [...prev.slice(0, -1), botResponse]);
+    } catch (error) {
+      console.error("Error in without cape chat:", error);
+      const errorResponse: Message = {
+        id: (Date.now() + 1).toString(),
+        content: "Sorry, there was an error processing your message.",
+        isUser: false,
+        timestamp: new Date(),
+      };
+      setWithoutMessages((prev) => [...prev.slice(0, -1), errorResponse]);
+    } finally {
+      setIsWithoutLoading(false);
+    }
   };
 
-  const handleWithMessage = (content: string) => {
-    const { maskedContent, detectedItems } = maskSensitiveData(content);
-
+  const handleWithMessage = async (content: string) => {
     const userMessage: Message = {
       id: Date.now().toString(),
       content,
@@ -228,16 +306,53 @@ export default function FunctionalityPage() {
       timestamp: new Date(),
     };
 
-    const botResponse: Message = {
+    const loadingMessage: Message = {
       id: (Date.now() + 1).toString(),
-      content: `I can see your message: "${content}". I'll process this information as provided.`,
-      maskedContent: `I can see your message: "${maskedContent}". I'll process this information safely with sensitive data protected.`,
+      content: "",
       isUser: false,
       timestamp: new Date(),
-      sensitiveItems: detectedItems,
+      isLoading: true,
     };
 
-    setWithMessages((prev) => [...prev, userMessage, botResponse]);
+    setWithMessages((prev) => [...prev, userMessage, loadingMessage]);
+    setIsWithLoading(true);
+
+    try {
+      // Send input and get pseudonymized output
+      await apiService.sendPseudonymizedInput(content);
+      const pseudonymizedResponse = await apiService.getPseudonymizedOutput();
+
+      // Local masking for demonstration (you can remove this if API handles it)
+      const { maskedContent, detectedItems } = maskSensitiveData(content);
+
+      const botResponse: Message = {
+        id: (Date.now() + 1).toString(),
+        content:
+          pseudonymizedResponse.output || `Original response for: "${content}"`,
+        maskedContent:
+          pseudonymizedResponse.pseudonymized_output ||
+          `Privacy-protected response: "${maskedContent}"`,
+        isUser: false,
+        timestamp: new Date(),
+        sensitiveItems:
+          detectedItems.length > 0
+            ? detectedItems
+            : pseudonymizedResponse.detected_entities || [],
+      };
+
+      setWithMessages((prev) => [...prev.slice(0, -1), botResponse]);
+    } catch (error) {
+      console.error("Error in with cape chat:", error);
+      const errorResponse: Message = {
+        id: (Date.now() + 1).toString(),
+        content: "Sorry, there was an error processing your message.",
+        isUser: false,
+        timestamp: new Date(),
+      };
+      setWithMessages((prev) => [...prev.slice(0, -1), errorResponse]);
+    } finally {
+      setIsWithLoading(false);
+    }
   };
 
   const insertSampleData = () => {
@@ -271,11 +386,23 @@ export default function FunctionalityPage() {
 
             <motion.button
               onClick={insertSampleData}
-              className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-medium hover:shadow-lg transition-all duration-300"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              disabled={isWithoutLoading || isWithLoading}
+              className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-medium hover:shadow-lg transition-all duration-300 disabled:opacity-50"
+              whileHover={{
+                scale: !(isWithoutLoading || isWithLoading) ? 1.05 : 1,
+              }}
+              whileTap={{
+                scale: !(isWithoutLoading || isWithLoading) ? 0.95 : 1,
+              }}
             >
-              Try Sample Data
+              {isWithoutLoading || isWithLoading ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Processing...
+                </div>
+              ) : (
+                "Try Sample Data"
+              )}
             </motion.button>
           </div>
         </div>
@@ -295,7 +422,7 @@ export default function FunctionalityPage() {
           <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
             Compare how traditional AI handles sensitive data versus our
             privacy-preserving approach. Try entering personal information to
-            see real-time protection.
+            see real-time protection powered by our FastAPI backend.
           </p>
         </motion.div>
 
@@ -309,13 +436,14 @@ export default function FunctionalityPage() {
             className="h-full"
           >
             <ChatInterface
-              title="Without ThalesX"
+              title="Without Cape"
               description="Traditional AI chat without privacy protection"
               messages={withoutMessages}
               onSendMessage={handleWithoutMessage}
               showMasking={false}
               icon={AlertTriangle}
               accentColor="bg-red-500"
+              isLoading={isWithoutLoading}
             />
           </motion.div>
 
@@ -327,13 +455,14 @@ export default function FunctionalityPage() {
             className="h-full"
           >
             <ChatInterface
-              title="With ThalesX"
+              title="With Cape"
               description="Privacy-protected AI chat with real-time data masking"
               messages={withMessages}
               onSendMessage={handleWithMessage}
               showMasking={true}
               icon={Shield}
               accentColor="bg-green-500"
+              isLoading={isWithLoading}
             />
           </motion.div>
         </div>
@@ -370,6 +499,13 @@ export default function FunctionalityPage() {
                 <li>• Personal addresses (123 Main St, NYC)</li>
               </ul>
             </div>
+          </div>
+          <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+            <p className="text-sm text-blue-700 dark:text-blue-300">
+              <strong>Live API Integration:</strong> Messages are now processed
+              through our FastAPI backend for real-time pseudonymization and
+              privacy protection.
+            </p>
           </div>
         </motion.div>
       </div>
